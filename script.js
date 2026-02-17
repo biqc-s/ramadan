@@ -4,10 +4,13 @@ const ctx = canvas.getContext('2d');
 const nameInput = document.getElementById('nameInput');
 const errorMsg = document.getElementById('errorMsg');
 const canvasWrapper = document.getElementById('canvasWrapper');
+const canvasSection = document.getElementById('canvasSection');
 const downloadBtn = document.getElementById('downloadBtn');
 const shareBtn = document.getElementById('shareBtn');
+const generateBtn = document.getElementById('generateBtn');
 
-let currentName = "";
+let currentName = '';
+let isGenerating = false;
 
 // Configuration
 const CONFIG = {
@@ -29,59 +32,146 @@ const CONFIG = {
     }
 };
 
-// Initialize Styles and Events
+// Detect mobile
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || window.innerWidth < 768;
+
+// ===== Initialize =====
 document.addEventListener('DOMContentLoaded', () => {
     createStars();
+    createParticles();
     loadFonts();
 
-    document.getElementById('generateBtn').addEventListener('click', generateCard);
+    generateBtn.addEventListener('click', handleGenerate);
 
     nameInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') generateCard();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleGenerate();
+        }
+    });
+
+    // Clear error on input
+    nameInput.addEventListener('input', () => {
+        errorMsg.classList.remove('visible');
     });
 
     downloadBtn.addEventListener('click', downloadCard);
     shareBtn.addEventListener('click', shareCard);
 });
 
-// Font Loading
+// ===== Font Loading =====
 async function loadFonts() {
     try {
-        await document.fonts.load('80px Amiri');
-        await document.fonts.load('50px Amiri');
-        await document.fonts.load('30px Amiri');
+        await Promise.all([
+            document.fonts.load('80px Amiri'),
+            document.fonts.load('50px Amiri'),
+            document.fonts.load('30px Amiri'),
+            document.fonts.load('16px Tajawal')
+        ]);
     } catch (e) {
-        console.warn('Fonts loading failed or timed out', e);
+        console.warn('Font loading issue:', e);
     }
 }
 
-// Background HTML Stars Animation
+// ===== Background Stars =====
 function createStars() {
     const container = document.getElementById('stars-container');
-    const starCount = 80;
-    container.innerHTML = '';
+    const count = isMobile ? 40 : 70;
+    const fragment = document.createDocumentFragment();
 
-    for (let i = 0; i < starCount; i++) {
+    for (let i = 0; i < count; i++) {
         const star = document.createElement('div');
         star.className = 'star';
-        const size = Math.random() * 3 + 1;
-        star.style.width = `${size}px`;
-        star.style.height = `${size}px`;
-        star.style.left = `${Math.random() * 100}%`;
-        star.style.top = `${Math.random() * 100}%`;
-        star.style.animationDuration = `${Math.random() * 3 + 2}s`;
-        star.style.animationDelay = `${Math.random() * 2}s`;
-        container.appendChild(star);
+        const size = Math.random() * 2.5 + 0.5;
+        star.style.cssText = `
+            width:${size}px;
+            height:${size}px;
+            left:${Math.random() * 100}%;
+            top:${Math.random() * 100}%;
+            animation-duration:${Math.random() * 4 + 3}s;
+            animation-delay:${Math.random() * 3}s;
+        `;
+        fragment.appendChild(star);
     }
+
+    container.appendChild(fragment);
 }
 
-// --- Drawing Logic ---
+// ===== Floating Particles =====
+function createParticles() {
+    const container = document.getElementById('particles-container');
+    const count = isMobile ? 6 : 12;
+    const fragment = document.createDocumentFragment();
 
+    for (let i = 0; i < count; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        const size = Math.random() * 4 + 2;
+        const gold = Math.random() > 0.5;
+        particle.style.cssText = `
+            width:${size}px;
+            height:${size}px;
+            left:${Math.random() * 100}%;
+            background:${gold ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.2)'};
+            animation-duration:${Math.random() * 10 + 8}s;
+            animation-delay:${Math.random() * 8}s;
+        `;
+        fragment.appendChild(particle);
+    }
+
+    container.appendChild(fragment);
+}
+
+// ===== Generate Handler with debounce =====
+async function handleGenerate() {
+    if (isGenerating) return;
+
+    const name = nameInput.value.trim();
+    if (!name) {
+        errorMsg.classList.add('visible');
+        nameInput.focus();
+        // Haptic feedback on supported devices
+        if (navigator.vibrate) navigator.vibrate(50);
+        return;
+    }
+
+    errorMsg.classList.remove('visible');
+    isGenerating = true;
+    generateBtn.classList.add('loading');
+
+    // Blur input on mobile to hide keyboard
+    if (isMobile) {
+        nameInput.blur();
+    }
+
+    currentName = name;
+
+    // Small delay to show loading state
+    await new Promise(r => requestAnimationFrame(r));
+
+    try {
+        await generateCard();
+    } finally {
+        generateBtn.classList.remove('loading');
+        isGenerating = false;
+    }
+
+    // Show canvas section
+    canvasSection.classList.add('visible');
+
+    // Smooth scroll to result
+    requestAnimationFrame(() => {
+        canvasSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+}
+
+// ===== Canvas Setup =====
 function setupCanvas(w, h) {
-    const dpr = window.devicePixelRatio || 1;
-    // CSS handling for aspect ratio
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
     canvas.style.width = '100%';
-    canvas.style.maxWidth = '500px'; // Limit width on desktop
+    canvas.style.maxWidth = '500px';
     canvas.style.height = 'auto';
     canvas.style.aspectRatio = `${w}/${h}`;
 
@@ -90,6 +180,8 @@ function setupCanvas(w, h) {
     ctx.scale(dpr, dpr);
     return dpr;
 }
+
+// ===== Drawing Functions =====
 
 function drawGeometricPattern() {
     ctx.save();
@@ -125,7 +217,6 @@ function drawBackground() {
     ctx.fillRect(0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
 }
 
-// Advanced Qatt Asiri Motif: "Al-Banaq"
 function drawAlBanaq(x, y, size, color1, color2, inverted = false) {
     ctx.save();
     ctx.translate(x, y);
@@ -134,7 +225,6 @@ function drawAlBanaq(x, y, size, color1, color2, inverted = false) {
         ctx.translate(0, -size);
     }
 
-    // Main Triangle
     ctx.beginPath();
     ctx.moveTo(0, size);
     ctx.lineTo(size / 2, 0);
@@ -143,7 +233,6 @@ function drawAlBanaq(x, y, size, color1, color2, inverted = false) {
     ctx.fillStyle = color1;
     ctx.fill();
 
-    // Inner Diamond
     ctx.beginPath();
     ctx.moveTo(size / 2, size * 0.3);
     ctx.lineTo(size * 0.7, size * 0.7);
@@ -161,7 +250,6 @@ function drawAlBanaq(x, y, size, color1, color2, inverted = false) {
     ctx.restore();
 }
 
-// Advanced Qatt Asiri Motif: "Al-Maharbe"
 function drawAlMaharbe(x, y, size, color) {
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -186,30 +274,26 @@ function drawAlMaharbe(x, y, size, color) {
 }
 
 function drawModernBorder() {
-    const size = 40; // Larger for mobile
+    const size = 40;
     const w = CONFIG.canvasWidth;
     const h = CONFIG.canvasHeight;
     const { accentRed, accentGreen, accentOrange, secondaryGold } = CONFIG.colors;
 
-    // Top Strip
     for (let x = 0; x < w; x += size) {
         const iseven = (x / size) % 2 === 0;
         drawAlBanaq(x, 0, size, iseven ? accentRed : accentGreen, secondaryGold, true);
     }
 
-    // Bottom Strip
     for (let x = 0; x < w; x += size) {
         const iseven = (x / size) % 2 === 0;
         drawAlBanaq(x, h - size, size, iseven ? accentGreen : accentRed, secondaryGold, false);
     }
 
-    // Left Strip
     for (let y = size; y < h - size; y += size) {
         const iseven = (y / size) % 2 === 0;
         drawAlMaharbe(0, y, size, iseven ? accentOrange : secondaryGold);
     }
 
-    // Right Strip
     for (let y = size; y < h - size; y += size) {
         const iseven = (y / size) % 2 === 0;
         ctx.save();
@@ -227,7 +311,7 @@ function drawLantern(x, y, scale = 1) {
 
     // String
     ctx.beginPath();
-    ctx.moveTo(0, -300); // Longer string for mobile height
+    ctx.moveTo(0, -300);
     ctx.lineTo(0, 0);
     ctx.strokeStyle = CONFIG.colors.secondaryGold;
     ctx.lineWidth = 3;
@@ -288,7 +372,7 @@ function drawLantern(x, y, scale = 1) {
     ctx.closePath();
     ctx.fill();
 
-    // Tassles
+    // Tassel
     ctx.beginPath();
     ctx.moveTo(0, 105);
     ctx.lineTo(0, 120);
@@ -326,7 +410,6 @@ function drawText() {
     const cx = CONFIG.canvasWidth / 2;
     const cy = CONFIG.canvasHeight / 2;
 
-    ctx.align = 'center';
     ctx.textAlign = 'center';
     ctx.direction = 'rtl';
 
@@ -337,13 +420,13 @@ function drawText() {
     ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
-    ctx.fillText("مبارك عليكم الشهر الفضيل", cx, cy - 200);
+    ctx.fillText('مبارك عليكم الشهر الفضيل', cx, cy - 200);
 
     // Subheader
     ctx.font = '45px "Amiri"';
     ctx.fillStyle = CONFIG.colors.offWhite;
     ctx.shadowBlur = 2;
-    ctx.fillText("أسأل الله أن يجعله شهر قَبول ورضوان", cx, cy - 100);
+    ctx.fillText('أسأل الله أن يجعله شهر قَبول ورضوان', cx, cy - 100);
 
     // Name
     ctx.shadowColor = CONFIG.colors.secondaryGold;
@@ -351,7 +434,7 @@ function drawText() {
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    ctx.font = 'bold 110px "Amiri"'; // Larger for mobile
+    ctx.font = 'bold 110px "Amiri"';
     ctx.fillStyle = CONFIG.colors.white;
     ctx.fillText(currentName, cx, cy + 100);
 
@@ -359,7 +442,7 @@ function drawText() {
     ctx.font = '35px "Amiri"';
     ctx.fillStyle = '#aaa';
     ctx.shadowBlur = 0;
-    ctx.fillText("تقبّل الله منّا ومنكم صالح الأعمال", cx, cy + 250);
+    ctx.fillText('تقبّل الله منّا ومنكم صالح الأعمال', cx, cy + 250);
 }
 
 function drawBranding() {
@@ -367,68 +450,81 @@ function drawBranding() {
     const bottomY = CONFIG.canvasHeight - 60;
 
     ctx.textAlign = 'center';
-    ctx.direction = 'ltr'; // English text
-    ctx.font = '24px "Tajawal"'; // Use Tajawal for modern look
+    ctx.direction = 'ltr';
+    ctx.font = '24px "Tajawal"';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.shadowBlur = 0;
 
-    // Developer Credit
-    ctx.fillText("Developed by SAEED JAHASH | i3j.io", cx, bottomY - 35);
+    ctx.fillText('Developed by SAEED JAHASH | i3j.io', cx, bottomY - 35);
 
-    // Support info
     ctx.font = '20px "Tajawal"';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.fillText("Support: 0510072172", cx, bottomY);
-
-    // Add QR Code or Icon placeholder if needed
-    // For now, simpler text based branding as requested
+    ctx.fillText('Support: 0510072172', cx, bottomY);
 }
 
+// ===== Main Generate =====
 async function generateCard() {
-    const name = nameInput.value.trim();
-    if (!name) {
-        errorMsg.style.opacity = '1';
-        nameInput.focus();
-        return;
-    }
-
-    errorMsg.style.opacity = '0';
-    currentName = name;
-
     setupCanvas(CONFIG.canvasWidth, CONFIG.canvasHeight);
 
-    // Layers
     drawBackground();
     drawGeometricPattern();
     drawModernBorder();
 
-    // Moon (Top Right, adjusted for portrait)
     drawMoon(CONFIG.canvasWidth - 150, 200, 100);
 
-    // Lanterns (Hanging from top)
-    drawLantern(200, 100, 1.8);       // Large Left
-    drawLantern(CONFIG.canvasWidth - 300, 50, 1.2); // Medium Right
-    drawLantern(500, -20, 1.0);       // Small Center
+    drawLantern(200, 100, 1.8);
+    drawLantern(CONFIG.canvasWidth - 300, 50, 1.2);
+    drawLantern(500, -20, 1.0);
 
     drawText();
     drawBranding();
-
-    if (!canvasWrapper.classList.contains('show')) {
-        canvasWrapper.classList.remove('show');
-        void canvasWrapper.offsetWidth;
-        canvasWrapper.classList.add('show');
-    }
 }
 
+// ===== Download =====
 function downloadCard() {
     const link = document.createElement('a');
     link.download = `Ramadan_${currentName}.png`;
     link.href = canvas.toDataURL('image/png', 1.0);
     link.click();
+
+    // Haptic feedback
+    if (navigator.vibrate) navigator.vibrate(30);
 }
 
+// ===== Share =====
 function shareCard() {
+    // Try native share API first (better mobile experience)
+    if (navigator.share && navigator.canShare) {
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                fallbackWhatsAppShare();
+                return;
+            }
+
+            const file = new File([blob], `Ramadan_${currentName}.png`, { type: 'image/png' });
+            const shareData = {
+                title: 'تهنئة رمضان',
+                text: `رمضان كريم! بطاقة تهنئة خاصة لـ ${currentName}\n\nتم التطوير بواسطة: SAEED JAHASH\nرابط الموقع: https://i3j.io`,
+                files: [file]
+            };
+
+            try {
+                if (navigator.canShare(shareData)) {
+                    await navigator.share(shareData);
+                    return;
+                }
+            } catch (e) {
+                // User cancelled or error - fall through to WhatsApp
+            }
+
+            fallbackWhatsAppShare();
+        }, 'image/png');
+    } else {
+        fallbackWhatsAppShare();
+    }
+}
+
+function fallbackWhatsAppShare() {
     const text = encodeURIComponent(`رمضان كريم! 🌙 بطاقة تهنئة خاصة لـ ${currentName}\n\nتم التطوير بواسطة: SAEED JAHASH\nرابط الموقع: https://i3j.io`);
-    const url = `https://wa.me/?text=${text}`;
-    window.open(url, '_blank');
+    window.open(`https://wa.me/?text=${text}`, '_blank');
 }
