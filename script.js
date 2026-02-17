@@ -455,7 +455,7 @@ function drawBranding() {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.shadowBlur = 0;
 
-    ctx.fillText('Developed by SAEED JAHASH | i3j.io', cx, bottomY - 35);
+    ctx.fillText('Developed by S | i3j.io', cx, bottomY - 35);
 
     ctx.font = '20px "Tajawal"';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
@@ -528,3 +528,4 @@ function fallbackWhatsAppShare() {
     const text = encodeURIComponent(`رمضان كريم! 🌙 بطاقة تهنئة خاصة لـ ${currentName}\n\nتم التطوير بواسطة: SAEED JAHASH\nرابط الموقع: https://i3j.io`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
 }
+
